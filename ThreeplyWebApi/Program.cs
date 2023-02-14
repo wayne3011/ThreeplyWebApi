@@ -4,9 +4,9 @@ using ThreeplyWebApi.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.Configure<ScheduleDatabaseSettings>(builder.Configuration.GetSection("ThreeplyDatabase"));
+builder.Services.Configure<GroupsDatabaseSettings>(builder.Configuration.GetSection("ThreeplyDatabase"));
 builder.Services.AddControllers();
-builder.Services.AddSingleton<SchedulesService>();
+builder.Services.AddSingleton<GroupsService>();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

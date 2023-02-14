@@ -1,9 +1,9 @@
 ﻿namespace ThreeplyWebApi.Models
 {
-    public class ScheduleDatabaseSettings
+    public class GroupsDatabaseSettings
     {
         public string ConnectionString { get; set; } = null!;
         public string DatabaseName { get; set; } = null!;
-        public string SchedulesCollectionName { get; set; } = null!;
+        public string GroupsCollectionName { get; set; } = null!;
     }
 }
