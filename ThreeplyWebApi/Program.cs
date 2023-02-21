@@ -2,7 +2,6 @@ using ThreeplyWebApi.Services;
 using ThreeplyWebApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
-
 // Add services to the container.
 builder.Services.Configure<GroupsDatabaseSettings>(builder.Configuration.GetSection("ThreeplyDatabase"));
 builder.Services.AddControllers();
@@ -12,7 +11,6 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
-
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
