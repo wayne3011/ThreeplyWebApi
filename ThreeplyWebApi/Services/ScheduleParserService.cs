@@ -1,21 +1,19 @@
 ﻿using AngleSharp;
 using AngleSharp.Dom;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using ZstdSharp.Unsafe;
 using System.Security.Cryptography;
+using ThreeplyWebApi.Services.ScheduleParser.ScheduleParserExceptions;
+using MongoDB.Driver.Core.Misc;
+using static System.Net.Mime.MediaTypeNames;
 
-namespace ScheduleParser
+
+namespace ThreeplyWebApi.Services.ScheduleParser
 {
     public class ScheduleParserService
     {
         public string ScheduleUrl { get; set; }
-        private IBrowsingContext _context = BrowsingContext.New(new Configuration().WithDefaultLoader());
+        readonly private IBrowsingContext _context = BrowsingContext.New(new Configuration().WithDefaultLoader());
         public ScheduleParserService(string scheduleUrl)
         {
             this.ScheduleUrl = scheduleUrl;
@@ -24,14 +22,24 @@ namespace ScheduleParser
         async public Task<bool> CheckGroup(string groupName) => await CheckGroup(groupName);
         async private Task<Schedule> _getGroupSchedule(string groupName)
         {
-            if (!await _checkGroup(groupName)) throw new Exception("Invalid groupName");
+            if (!await _checkGroup(groupName)) throw new InvalidGroupNameException(ScheduleUrl,groupName);
             Schedule schedule = new Schedule();
-            for (int weekDay = 1; weekDay < await _getStudyWeekCount(groupName); weekDay++)
+            int studyWeekCount = await _getStudyWeekCount(groupName);
+            for (int weekDay = 1; weekDay <= studyWeekCount; weekDay++)
             {
-                var document = await _context.OpenAsync(ScheduleUrl + $"?group={groupName}&week={weekDay}");
+                var document = await _context.OpenAsync(ScheduleUrl + $"/index.php?group={groupName}&week={weekDay}");
+                if (document == null) throw new BrokenWebSiteConnectionException(ScheduleUrl,groupName);
                 var dayCards = document.QuerySelectorAll("body>main>div>div>div.col-lg-8.me-auto.mb-7.mb-lg-0>article>ul>li>div>div");
+                //TODO: WARNING DISIGN CHANGED!!!
+                if (dayCards.Length == 0)
+                {
+                    var isHaveScedule = document.QuerySelector("body>main>div>div>div.col-lg-8.me-auto.mb-7.mb-lg-0>article>div.w-md-75.w-xl-50.text-center.mx-md-auto.mb-5.mb-md-9>img");
+                    if (isHaveScedule == null) throw new AbsenceScheduleObjectsException(ScheduleUrl,groupName);
+                }
+                
                 foreach (var dayCard in dayCards)//parse study day
                 {
+                   
                     DaysSchedule daysSchedule = new DaysSchedule();
                     DateTime date = Convert.ToDateTime(
                     dayCard.FirstElementChild.Text().Trim(new char[] { '\n', '\t' }).Remove(0, 4)
@@ -43,7 +51,7 @@ namespace ScheduleParser
                         var classesCard = el.Children;
                         Classes classes = new Classes();
                         string classesNameRow = classesCard[0].Text().ClearNbsp();
-                        classes.Type = classesNameRow.Substring(classesNameRow.Length - 2);
+                        classes.Type = classesType[classesNameRow.Substring(classesNameRow.Length - 2)];
                         classes.Name = classesNameRow.Substring(0, classesNameRow.Length - 2);
                         var classesInfoRow = classesCard[1].Children;
                         classes.Ordinal = _getOrdinalFromClassesTime(classesInfoRow[0].Text());
@@ -52,12 +60,20 @@ namespace ScheduleParser
                             classes.Teacher = classesInfoRow[1].Text();
                             classes.Location = classesInfoRow[2].Text();
                         }
+                        else if(classesInfoRow.Length == 4)
+                        {
+                            classes.Teacher = classesInfoRow[1].Text()+"/"+ classesInfoRow[2].Text();
+                            classes.Location = classesInfoRow[3].Text();
+                        }
                         else
                         {
                             classes.Location = classesInfoRow[1].Text();
                         }
                         daysSchedule.Classes.Add(classes);
+                        Console.WriteLine(classes.Name);
+                        Console.WriteLine(classes.Location);
                     }
+                    
                     daysSchedule.HashSum = _computeDaysScheduleHashSum(daysSchedule.Classes);
                     schedule.Week[(int)date.DayOfWeek - 1].InsertDaysChedule(daysSchedule);
                 }
@@ -68,26 +84,38 @@ namespace ScheduleParser
         async private Task<int> _getStudyWeekCount(string groupName)
         {
             var document = await _context.OpenAsync(ScheduleUrl + $"?group={groupName}");
-            var studyWeeks = document.QuerySelectorAll("#collapseWeeks>div>div>ul>li");
-            //if (weekCount == 0) throw new Exception("Unable to open Schedule Url for getStudyWeekCount");
-            int weekCount = studyWeeks.Count();
-            //if (document.GetElementsByClassName("step mb-5"))
-            
+            var studyWeeks = document.QuerySelectorAll("#collapseWeeks>div>div>ul>li");           
+            int weekCount = studyWeeks.Length;
             return weekCount;
         }
+        
         async private Task<bool> _checkGroup(string groupName)
         {
             int facultyNumber;
             int courseNumber;
-            if(!Regex.IsMatch(groupName, "\\w[0-9]{1,2}|И\\w-[0-9]{3}\\w{1,2}-[0-9]{1,2}")) return false;
-            string facultyNumberString = Regex.Match(groupName, "[0-9]{1,2}").Value;
-            if (facultyNumberString == "И") facultyNumber = 10;
-            else if (!int.TryParse(facultyNumberString, out facultyNumber)) return false;
+            string courseNumberString;
+            if (!Regex.IsMatch(groupName, "\\w[0-9]{1,2}|И\\w-[0-9]{3}\\w{1,3}-[0-9]{2}")) return false;
+            string facultyNumberString = Regex.Match(groupName, "[0-9]{1,2}|И").Value;
+            if (facultyNumberString == "И")
+            {
+                facultyNumber = 10;
+                courseNumberString = Regex.Matches(groupName, "[0-9]").ElementAt(0).Value;
+            }
+            else
+            {
+                if (!int.TryParse(facultyNumberString, out facultyNumber)) return false;
+                courseNumberString = Regex.Matches(groupName, "[0-9]").ElementAt(1).Value;
+            }
+            courseNumber = int.Parse(courseNumberString);
             if (facultyNumber < 1 || facultyNumber > 12) return false;
-            string courseNumberString = Regex.Matches(groupName, "[0-9]").ElementAt(1).Value;
+            if (courseNumber < 1 || courseNumber > 6) return false;
+            var document = await _context.OpenAsync(ScheduleUrl + $"/groups.php?department=Институт+№{facultyNumber}&course={courseNumber}");
+            var groupList = document.QuerySelector("body>main>div>div>div.col-lg-8.me-auto.mb-7.mb-lg-0>article>div.tab-content")?.Text().ClearNbsp();
+            if (groupList == null) throw new Exception("Invalid scheduleURL");
+            if (!Regex.IsMatch(groupList, groupName)) return false;
             return true;
         }
-        private int _getOrdinalFromClassesTime(string time)
+        static private int _getOrdinalFromClassesTime(string time)
         {
             switch (time)
             {
@@ -123,10 +151,89 @@ namespace ScheduleParser
             }
             return Convert.ToHexString(mD5.ComputeHash(Encoding.UTF8.GetBytes(classesHashSB.ToString())));
         }
+        static private Dictionary<string, string> classesType = new Dictionary<string, string>()
+        {
+            //lecture practical laboratory test exam
+            {"ЛК", "lecture"},
+            {"ПЗ", "practical"},
+            {"ЛР", "laboratory"},
+            {"ЭКЗ", "exam"},
+        };
     }
+    public static class StringExtensions
+    {
+        public static string ClearNbsp(this string str) => Regex.Replace(str, "[\t\n]", String.Empty);
+    }
+
+    namespace ScheduleParserExceptions
+    {
+        [Serializable]
+        public class ScheduleParserException : Exception
+        {
+            public string ScheduleUrl { get; } = "";
+            public string GroupName { get; } = "";
+            public ScheduleParserException() { }
+            public ScheduleParserException(string message) : base(message) { }
+            public ScheduleParserException(string message, Exception inner) : base(message, inner) { }
+            protected ScheduleParserException(
+              System.Runtime.Serialization.SerializationInfo info,
+              System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+
+            public ScheduleParserException(string message, string scheduleUrl) : base(message)
+            {
+                ScheduleUrl = scheduleUrl;
+            }
+            public ScheduleParserException(string message, string scheduleUrl, string groupName) : base(message)
+            {
+                ScheduleUrl = scheduleUrl;
+                GroupName = groupName;
+            }
+        }
+
+        [Serializable]
+        public class InvalidGroupNameException : ScheduleParserException
+        {
+            private static string _defaultMessage = "Invalid groupName";
+            public InvalidGroupNameException() { }
+            public InvalidGroupNameException(string message) : base(message) { }
+            public InvalidGroupNameException(string message, Exception inner) : base(message, inner) { }
+            public InvalidGroupNameException(string scheduleUrl, string groupName) : base(_defaultMessage, scheduleUrl, groupName) { }
+            public InvalidGroupNameException(string message, string scheduleUrl, string groupName) : base(message, scheduleUrl, groupName) { }
+            protected InvalidGroupNameException(
+              System.Runtime.Serialization.SerializationInfo info,
+              System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+        }
+        [Serializable]
+        public class BrokenWebSiteConnectionException : ScheduleParserException
+        {
+            private static string _defaultMessage = "Durimg parsing, it was not to possible to get the next object of the Schedule.\n Connection with the site might be broken";
+            public BrokenWebSiteConnectionException() { }
+            public BrokenWebSiteConnectionException(string message) : base(message) { }
+            public BrokenWebSiteConnectionException(string message, Exception inner) : base(message, inner) { }
+            public BrokenWebSiteConnectionException(string scheduleUrl, string groupName) : base(_defaultMessage, scheduleUrl, groupName) { }
+            public BrokenWebSiteConnectionException(string message, string scheduleUrl, string groupName) : base(message, scheduleUrl, groupName) { }
+            protected BrokenWebSiteConnectionException(
+              System.Runtime.Serialization.SerializationInfo info,
+              System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+        }
+
+        [Serializable]
+        public class AbsenceScheduleObjectsException : ScheduleParserException
+        {
+            private static string _defaultMessage = "Failed to get the objects with the schedule";
+            public AbsenceScheduleObjectsException() { }
+            public AbsenceScheduleObjectsException(string message) : base(message) { }
+            public AbsenceScheduleObjectsException(string message, Exception inner) : base(message, inner) { }
+            public AbsenceScheduleObjectsException(string scheduleUrl, string groupName) : base(_defaultMessage, scheduleUrl, groupName) { }
+            public AbsenceScheduleObjectsException(string message, string scheduleUrl, string groupName) : base(message, scheduleUrl, groupName) { }
+            protected AbsenceScheduleObjectsException(
+              System.Runtime.Serialization.SerializationInfo info,
+              System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+        }
+    }
+   
+
+
+
 }
 
-public static class StringExtensions
-{
-    public static string ClearNbsp(this string str) => Regex.Replace(str, "[\t\n]", String.Empty);
-}

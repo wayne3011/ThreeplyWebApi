@@ -4,7 +4,7 @@ using ThreeplyWebApi.Models;
 using Newtonsoft.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
-using ScheduleParser;
+using ThreeplyWebApi.Services.ScheduleParser;
 
 namespace ThreeplyWebApi.Services
 {
@@ -25,14 +25,15 @@ namespace ThreeplyWebApi.Services
         public async Task<Group> GetAsync(string groupName)
         {
             var group = await _groupsCollection.Find(x => x.GroupName == groupName).FirstOrDefaultAsync();
-            if (group == null)
-            {
-                ScheduleParserService _scheduleParserService = new ScheduleParserService("https://mai.ru/education/studies/schedule/index.php");
-                Schedule groupSchedule = await _scheduleParserService.GetGroupScheduleAsync(groupName);
-                group = new Group(groupName);
-                group.Schedule = groupSchedule;
-            }
-            await CreateAsync(group);
+
+                if (group == null)
+                {
+                    ScheduleParserService _scheduleParserService = new ScheduleParserService("https://mai.ru/education/studies/schedule");
+                    Schedule groupSchedule = await _scheduleParserService.GetGroupScheduleAsync(groupName);
+                    group = new Group(groupName);
+                    group.Schedule = groupSchedule;
+                    await CreateAsync(group);
+                }                     
             return group;
         }
         
@@ -45,5 +46,5 @@ namespace ThreeplyWebApi.Services
         public async Task RemoveAsync(string groupName) =>
             await _groupsCollection.DeleteOneAsync(x => x.GroupName == groupName);
     }
-    
+   
 }
