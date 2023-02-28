@@ -19,7 +19,8 @@ namespace ThreeplyWebApi.Controllers.AuthenticationScheme
             StringValues userId = "";
             if (Context.Request.Headers.TryGetValue("User-Id",out userId))
             {
-                var principal = new ClaimsPrincipal(new ClaimsIdentity(userId));
+                
+                var principal = new ClaimsPrincipal(new ClaimsIdentity(this.Scheme.Name,"User-Id");
                 var ticket = new AuthenticationTicket(principal, this.Scheme.Name);
                 return AuthenticateResult.Success(ticket);
             }
