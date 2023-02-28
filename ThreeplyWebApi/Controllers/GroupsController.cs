@@ -1,13 +1,18 @@
 ﻿using Newtonsoft.Json;
 using Microsoft.AspNetCore.Mvc;
 using ThreeplyWebApi.Services;
+using ThreeplyWebApi.Controllers.Extensions;
 using ThreeplyWebApi.Models;
 using System.Text.Json;
+using ThreeplyWebApi.Services.ScheduleParser.ScheduleParserExceptions;
+using System.Net;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ThreeplyWebApi.Controllers
 {
     [ApiController]
-    [Route("controller")]
+    [Route("Groups")]
+    [Authorize]
     public class GroupsController : ControllerBase
     {
         readonly private GroupsService _groupsService;
@@ -17,17 +22,23 @@ namespace ThreeplyWebApi.Controllers
             _groupsService = schedulesService;
         }
         [HttpGet]
-        public async Task<List<Group>> Get() => await _groupsService.GetAsync();
+        public async Task<List<Group>> Get() {
+            var group = await _groupsService.GetAsync();
+            return group;
+        } 
 
         [HttpGet("{groupName}")]
         public async Task<ActionResult<Group>> Get(string groupName)
         {
-            var group = await _groupsService.GetAsync(groupName);
-            if (group == null)
+            try
             {
-                return NotFound();
+                var group = await _groupsService.GetAsync(groupName);
+                return Ok(group);
             }
-            return Ok(group);
+            catch (ScheduleParserException ex)
+            {
+                return ScheduleParserProblemResult(ex);            
+            }
         }
         [HttpPost]
         public async Task<IActionResult> Post([FromBody]Group newGroup) 
@@ -47,6 +58,14 @@ namespace ThreeplyWebApi.Controllers
             newGroup.Id = group.Id;
             await _groupsService.UpdateAsync(groupName, newGroup);
             return NoContent();
+        }
+        private JsonResult ScheduleParserProblemResult(ScheduleParserException ex)
+        {
+            ProblemDetails problemDetails = ex.toProblemDetails();
+            JsonResult responce = new JsonResult(problemDetails);
+            responce.StatusCode = problemDetails.Status;
+            responce.ContentType = "application/json+problem; charset=utf-8";
+            return responce;
         }
     }
 }
