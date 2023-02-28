@@ -7,12 +7,13 @@ using System.Text.Json;
 using ThreeplyWebApi.Services.ScheduleParser.ScheduleParserExceptions;
 using System.Net;
 using Microsoft.AspNetCore.Authorization;
+using ThreeplyWebApi.Controllers.AuthenticationScheme;
 
 namespace ThreeplyWebApi.Controllers
 {
     [ApiController]
     [Route("Groups")]
-    [Authorize]
+    [Authorize(AuthenticationSchemes = GeneralUserAuthenticationSchemeOptions.Name)]
     public class GroupsController : ControllerBase
     {
         readonly private GroupsService _groupsService;
@@ -24,6 +25,7 @@ namespace ThreeplyWebApi.Controllers
         [HttpGet]
         public async Task<List<Group>> Get() {
             var group = await _groupsService.GetAsync();
+            
             return group;
         } 
 

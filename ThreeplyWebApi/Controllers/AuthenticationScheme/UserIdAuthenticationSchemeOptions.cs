@@ -2,9 +2,10 @@
 
 namespace ThreeplyWebApi.Controllers.AuthenticationScheme
 {
-    public class UserIdAuthenticationSchemeOptions : AuthenticationSchemeOptions
+    public class GeneralUserAuthenticationSchemeOptions : AuthenticationSchemeOptions
     {
-        public UserIdAuthenticationSchemeOptions() : base()
+        public const string Name = "GeneralUserAuthenticationScheme";
+        public GeneralUserAuthenticationSchemeOptions() : base()
         {
         }
     }
