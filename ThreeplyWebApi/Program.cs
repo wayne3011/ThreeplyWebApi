@@ -11,10 +11,12 @@ builder.Services.AddAuthentication();
 
 builder.Services.AddControllers();
 builder.Services.AddSingleton<GroupsService>();
-builder.Services.AddAuthentication("UserId").AddScheme<UserIdAuthenticationSchemeOptions, UserIdAuthenticationSchemeHandler>("UserId",options => { });
+
+builder.Services.AddAuthentication(GeneralUserAuthenticationSchemeOptions.Name).
+    AddScheme<GeneralUserAuthenticationSchemeOptions, GeneralUserAuthenticationSchemeHandler>(GeneralUserAuthenticationSchemeOptions.Name, opt => { });
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+//builder.Services.AddSwaggerGen();
 var app = builder.Build();
 // Configure the HTTP request pipeline.
 //if (app.Environment.IsDevelopment())
