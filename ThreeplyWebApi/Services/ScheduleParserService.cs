@@ -6,7 +6,7 @@ using System.Security.Cryptography;
 using ThreeplyWebApi.Services.ScheduleParser.ScheduleParserExceptions;
 using MongoDB.Driver.Core.Misc;
 using static System.Net.Mime.MediaTypeNames;
-
+using ThreeplyWebApi.Models.GroupModel;
 
 namespace ThreeplyWebApi.Services.ScheduleParser
 {
