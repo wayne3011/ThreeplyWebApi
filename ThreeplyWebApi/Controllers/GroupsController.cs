@@ -8,6 +8,7 @@ using ThreeplyWebApi.Services.ScheduleParser.ScheduleParserExceptions;
 using System.Net;
 using Microsoft.AspNetCore.Authorization;
 using ThreeplyWebApi.Controllers.AuthenticationScheme;
+using ThreeplyWebApi.Models.GroupModel;
 
 namespace ThreeplyWebApi.Controllers
 {

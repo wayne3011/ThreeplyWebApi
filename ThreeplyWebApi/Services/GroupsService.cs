@@ -1,10 +1,9 @@
 ﻿using MongoDB.Driver;
 using Microsoft.Extensions.Options;
-using ThreeplyWebApi.Models;
 using Newtonsoft.Json;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using ThreeplyWebApi.Services.ScheduleParser;
+using ThreeplyWebApi.Models.GroupModel;
 
 namespace ThreeplyWebApi.Services
 {
@@ -12,11 +11,9 @@ namespace ThreeplyWebApi.Services
     public class GroupsService
     {
         private readonly IMongoCollection<Group> _groupsCollection;
-        public GroupsService(IOptions<GroupsDatabaseSettings> groupDatabaseSettings)
+        public GroupsService(IOptions<GroupsOptions> options,MongoDbService mongoDbService)
         {
-            var MongoClient = new MongoClient(groupDatabaseSettings.Value.ConnectionString);
-            var MongoDatabase = MongoClient.GetDatabase(groupDatabaseSettings.Value.DatabaseName);
-            _groupsCollection = MongoDatabase.GetCollection<Group>(groupDatabaseSettings.Value.GroupsCollectionName);
+            _groupsCollection = mongoDbService.MongoDatabase.GetCollection<Group>(options.Value.GroupsCollectionName);
         }
         public async Task<List<Group>> GetAsync()
         {
