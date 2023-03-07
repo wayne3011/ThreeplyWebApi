@@ -12,6 +12,7 @@ namespace ThreeplyWebApi.Models.GroupModel
         [JsonIgnore] public string? Id { get; set; }
         public string GroupName { get; set; }
         public Schedule Schedule { get; set; }
+        public DateTime LastTimeUpdate { get; set; }
         public Group()
         {
             GroupName = "UNKNOWN";
