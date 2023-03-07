@@ -6,7 +6,6 @@ using Serilog.Configuration;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
-
 // Add services to the container.
 builder.Services.Configure<GroupsOptions>(builder.Configuration.GetSection("Groups"));
 builder.Services.Configure<MongoDbOptions>(builder.Configuration.GetSection("ThreeplyDatabase"));
@@ -24,7 +23,6 @@ builder.Services.AddAuthentication(GeneralUserAuthenticationSchemeOptions.Name).
 builder.Services.AddEndpointsApiExplorer();
 //builder.Services.AddSwaggerGen();
 var app = builder.Build();
-
 // Configure the HTTP request pipeline.
 //if (app.Environment.IsDevelopment())
 //{

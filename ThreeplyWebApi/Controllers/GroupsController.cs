@@ -37,7 +37,9 @@ namespace ThreeplyWebApi.Controllers
             try
             {
                 var group = await _groupsService.GetAsync(groupName);
+
                 _logger.LogInformation("GET/{GroupName} GroupController UserId:{UserId}", groupName, HttpContext.User.Identity.Name);
+
                 return Ok(group);
             }
             catch (ScheduleParserException ex)

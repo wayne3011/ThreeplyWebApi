@@ -27,6 +27,7 @@ namespace ThreeplyWebApi.Controllers.AuthenticationScheme
                 var claimsIdentity = new ClaimsIdentity(claims, "GeneralUserAuthentication");
                 var principal = new ClaimsPrincipal(claimsIdentity);
                 var ticket = new AuthenticationTicket(principal,this.Scheme.Name);
+
                 return AuthenticateResult.Success(ticket);
             }
             else
