@@ -18,15 +18,16 @@ namespace ThreeplyWebApi.Controllers
     public class GroupsController : ControllerBase
     {
         readonly private GroupsService _groupsService;
-
-        public GroupsController(GroupsService schedulesService)
+        readonly private ILogger<GroupsController> _logger;
+        public GroupsController(GroupsService schedulesService, ILogger<GroupsController> logger)
         {
             _groupsService = schedulesService;
+            _logger = logger;
         }
         [HttpGet]
         public async Task<List<Group>> Get() {
             var group = await _groupsService.GetAsync();
-            
+            _logger.LogInformation("GET GroupController UserId:{UserId}", HttpContext.User.Identity.Name);
             return group;
         } 
 
@@ -36,13 +37,23 @@ namespace ThreeplyWebApi.Controllers
             try
             {
                 var group = await _groupsService.GetAsync(groupName);
-                Console.WriteLine(HttpContext.User.Identities.);
+
+                _logger.LogInformation("GET/{GroupName} GroupController UserId:{UserId}", groupName, HttpContext.User.Identity.Name);
+
                 return Ok(group);
             }
             catch (ScheduleParserException ex)
             {
                 return ScheduleParserProblemResult(ex);            
             }
+        }
+        [HttpGet()]
+        [Route("GetGroupValidity/{groupName}")]
+        public async Task<GroupValidation> GetGroupValidity(string groupName)
+        {
+            GroupValidation groupValidation = await _groupsService.GetGroupValidationAsync(groupName);
+            _logger.LogInformation("GetGroupValidity/{GroupName} GroupController UserId:{UserId} Result:{isValid:}",groupName,HttpContext.User.Identity.Name, groupValidation.isValid);
+            return groupValidation;
         }
         [HttpPost]
         public async Task<IActionResult> Post([FromBody]Group newGroup) 

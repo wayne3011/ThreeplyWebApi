@@ -7,6 +7,8 @@ using ThreeplyWebApi.Services.ScheduleParser.ScheduleParserExceptions;
 using MongoDB.Driver.Core.Misc;
 using static System.Net.Mime.MediaTypeNames;
 using ThreeplyWebApi.Models.GroupModel;
+using MongoDB.Driver.Linq;
+using System.Globalization;
 
 namespace ThreeplyWebApi.Services.ScheduleParser
 {
@@ -19,10 +21,10 @@ namespace ThreeplyWebApi.Services.ScheduleParser
             this.ScheduleUrl = scheduleUrl;
         }
         async public Task<Schedule> GetGroupScheduleAsync(string groupName) => await _getGroupSchedule(groupName);
-        async public Task<bool> CheckGroup(string groupName) => await CheckGroup(groupName);
+        async public Task<string> FormatGroupNameAsync(string groupName) => await _formatGroupName(groupName);
         async private Task<Schedule> _getGroupSchedule(string groupName)
         {
-            if (!await _checkGroup(groupName)) throw new InvalidGroupNameException(ScheduleUrl,groupName);
+            //if (await _formatGroupName(groupName) == string.Empty) throw new InvalidGroupNameException(ScheduleUrl,groupName);
             Schedule schedule = new Schedule();
             int studyWeekCount = await _getStudyWeekCount(groupName);
             for (int weekDay = 1; weekDay <= studyWeekCount; weekDay++)
@@ -89,31 +91,42 @@ namespace ThreeplyWebApi.Services.ScheduleParser
             return weekCount;
         }
         
-        async private Task<bool> _checkGroup(string groupName)
+        async private Task<string> _formatGroupName(string groupName)
         {
             int facultyNumber;
             int courseNumber;
             string courseNumberString;
-            if (!Regex.IsMatch(groupName, "\\w[0-9]{1,2}|И\\w-[0-9]{3}\\w{1,3}-[0-9]{2}")) return false;
-            string facultyNumberString = Regex.Match(groupName, "[0-9]{1,2}|И").Value;
-            if (facultyNumberString == "И")
+            string formattedGroupName = "";
+            groupName = groupName.ToLower();
+            groupName = Regex.Replace(groupName, "-", "");
+            //if (!Regex.IsMatch(groupName, "\\w[0-9]{1,2}|И\\w-[0-9]{3}\\w{1,3}-[0-9]{2}")) return false;
+            if (!Regex.IsMatch(groupName, "\\w[0-9]{1,2}|и\\w[0-9]{3}\\w{1,3}[0-9]{2}")) throw new InvalidGroupNameException(ScheduleUrl, groupName); ;
+            string facultyNumberString = Regex.Match(groupName, "[0-9]{1,2}|и").Value;
+            if (facultyNumberString == "и")
             {
                 facultyNumber = 10;
                 courseNumberString = Regex.Matches(groupName, "[0-9]").ElementAt(0).Value;
+                formattedGroupName += groupName.Substring(0, 3).ToUpper();
             }
             else
             {
-                if (!int.TryParse(facultyNumberString, out facultyNumber)) return false;
+                if (!int.TryParse(facultyNumberString, out facultyNumber)) throw new InvalidGroupNameException(ScheduleUrl, groupName); ;
+                formattedGroupName += Regex.Match(groupName, "\\w[0-9]{1,2}\\w").Value.ToUpper() + "-";  
                 courseNumberString = Regex.Matches(groupName, "[0-9]").ElementAt(1).Value;
             }
             courseNumber = int.Parse(courseNumberString);
-            if (facultyNumber < 1 || facultyNumber > 12) return false;
-            if (courseNumber < 1 || courseNumber > 6) return false;
+            if (facultyNumber < 1 || facultyNumber > 12) throw new InvalidGroupNameException(ScheduleUrl, groupName); ;
+            if (courseNumber < 1 || courseNumber > 6) throw new InvalidGroupNameException(ScheduleUrl, groupName); ;
+            formattedGroupName += Regex.Match(groupName, "[0-9]{3}");
+            string learningProfile = string.Join("",Regex.Matches(groupName, "[а-я]"));
+            learningProfile = learningProfile.Substring(2);
+            learningProfile = Char.ToUpper(learningProfile[0]) + learningProfile.Substring(1);
+            formattedGroupName += learningProfile + "-" + groupName.Substring(groupName.Length - 2);          
             var document = await _context.OpenAsync(ScheduleUrl + $"/groups.php?department=Институт+№{facultyNumber}&course={courseNumber}");
             var groupList = document.QuerySelector("body>main>div>div>div.col-lg-8.me-auto.mb-7.mb-lg-0>article>div.tab-content")?.Text().ClearNbsp();
             if (groupList == null) throw new Exception("Invalid scheduleURL");
-            if (!Regex.IsMatch(groupList, groupName)) return false;
-            return true;
+            if (!Regex.IsMatch(groupList, formattedGroupName)) throw new InvalidGroupNameException(ScheduleUrl, groupName); ;
+            return formattedGroupName;
         }
         static private int _getOrdinalFromClassesTime(string time)
         {
