@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using MongoDB.Driver.Core.Configuration;
+using ThreeplyWebApi.Services.ServicesOptions;
 
 namespace ThreeplyWebApi.Services
 {
@@ -10,6 +12,7 @@ namespace ThreeplyWebApi.Services
         {
             var MongoClient = new MongoClient(options.Value.ConnectionString);
             MongoDatabase = MongoClient.GetDatabase(options.Value.DatabaseName);
+       
         }
     }
 }

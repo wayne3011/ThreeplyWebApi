@@ -9,6 +9,9 @@ using static System.Net.Mime.MediaTypeNames;
 using ThreeplyWebApi.Models.GroupModel;
 using MongoDB.Driver.Linq;
 using System.Globalization;
+using Microsoft.Extensions.Options;
+using System.Web;
+using ThreeplyWebApi.Services.ServicesOptions;
 
 namespace ThreeplyWebApi.Services.ScheduleParser
 {
@@ -16,20 +19,20 @@ namespace ThreeplyWebApi.Services.ScheduleParser
     {
         public string ScheduleUrl { get; set; }
         readonly private IBrowsingContext _context = BrowsingContext.New(new Configuration().WithDefaultLoader());
-        public ScheduleParserService(string scheduleUrl)
+        public ScheduleParserService(IOptions<ScheduleParserOptions> options)
         {
-            this.ScheduleUrl = scheduleUrl;
+            this.ScheduleUrl = options.Value.maiScheduleUrl;
         }
         async public Task<Schedule> GetGroupScheduleAsync(string groupName) => await _getGroupSchedule(groupName);
         async public Task<string> FormatGroupNameAsync(string groupName) => await _formatGroupName(groupName);
         async private Task<Schedule> _getGroupSchedule(string groupName)
         {
-            //if (await _formatGroupName(groupName) == string.Empty) throw new InvalidGroupNameException(ScheduleUrl,groupName);
             Schedule schedule = new Schedule();
             int studyWeekCount = await _getStudyWeekCount(groupName);
             for (int weekDay = 1; weekDay <= studyWeekCount; weekDay++)
             {
-                var document = await _context.OpenAsync(ScheduleUrl + $"/index.php?group={groupName}&week={weekDay}");
+                string url = ($"/index.php?group={HttpUtility.UrlEncode(groupName)}&week={HttpUtility.UrlEncode(weekDay.ToString())}");
+                var document = await _context.OpenAsync(ScheduleUrl + url);
                 if (document == null) throw new BrokenWebSiteConnectionException(ScheduleUrl,groupName);
                 var dayCards = document.QuerySelectorAll("body>main>div>div>div.col-lg-8.me-auto.mb-7.mb-lg-0>article>ul>li>div>div");
                 //TODO: WARNING DISIGN CHANGED!!!
@@ -72,8 +75,7 @@ namespace ThreeplyWebApi.Services.ScheduleParser
                             classes.Location = classesInfoRow[1].Text();
                         }
                         daysSchedule.Classes.Add(classes);
-                        Console.WriteLine(classes.Name);
-                        Console.WriteLine(classes.Location);
+
                     }
                     
                     daysSchedule.HashSum = _computeDaysScheduleHashSum(daysSchedule.Classes);
@@ -99,8 +101,7 @@ namespace ThreeplyWebApi.Services.ScheduleParser
             string formattedGroupName = "";
             groupName = groupName.ToLower();
             groupName = Regex.Replace(groupName, "-", "");
-            //if (!Regex.IsMatch(groupName, "\\w[0-9]{1,2}|И\\w-[0-9]{3}\\w{1,3}-[0-9]{2}")) return false;
-            if (!Regex.IsMatch(groupName, "\\w[0-9]{1,2}|и\\w[0-9]{3}\\w{1,3}[0-9]{2}")) throw new InvalidGroupNameException(ScheduleUrl, groupName); ;
+            if (!Regex.IsMatch(groupName, "\\w([0-9]{1,2}|и)\\w[0-9]{3}\\w{1,3}[0-9]{2}")) throw new InvalidGroupNameException(ScheduleUrl, groupName);
             string facultyNumberString = Regex.Match(groupName, "[0-9]{1,2}|и").Value;
             if (facultyNumberString == "и")
             {
@@ -118,7 +119,7 @@ namespace ThreeplyWebApi.Services.ScheduleParser
             if (facultyNumber < 1 || facultyNumber > 12) throw new InvalidGroupNameException(ScheduleUrl, groupName); ;
             if (courseNumber < 1 || courseNumber > 6) throw new InvalidGroupNameException(ScheduleUrl, groupName); ;
             formattedGroupName += Regex.Match(groupName, "[0-9]{3}");
-            string learningProfile = string.Join("",Regex.Matches(groupName, "[а-я]"));
+            string learningProfile = string.Join("",Regex.Matches(groupName, "[а-я]|[a-z]"));
             learningProfile = learningProfile.Substring(2);
             learningProfile = Char.ToUpper(learningProfile[0]) + learningProfile.Substring(1);
             formattedGroupName += learningProfile + "-" + groupName.Substring(groupName.Length - 2);          
@@ -150,7 +151,7 @@ namespace ThreeplyWebApi.Services.ScheduleParser
                     throw new Exception("Invalid class time");
             }
         }
-        private string _computeDaysScheduleHashSum(List<Classes> classes)
+        static private string _computeDaysScheduleHashSum(List<Classes> classes)
         {
             using MD5 mD5 = MD5.Create();
             StringBuilder classesHashSB = new StringBuilder();
@@ -164,7 +165,7 @@ namespace ThreeplyWebApi.Services.ScheduleParser
             }
             return Convert.ToHexString(mD5.ComputeHash(Encoding.UTF8.GetBytes(classesHashSB.ToString())));
         }
-        static private Dictionary<string, string> classesType = new Dictionary<string, string>()
+        readonly static private Dictionary<string, string> classesType = new Dictionary<string, string>()
         {
             //lecture practical laboratory test exam
             {"ЛК", "lecture"},
@@ -206,7 +207,7 @@ namespace ThreeplyWebApi.Services.ScheduleParser
         [Serializable]
         public class InvalidGroupNameException : ScheduleParserException
         {
-            private static string _defaultMessage = "Invalid groupName";
+            readonly private static string _defaultMessage = "Invalid groupName";
             public InvalidGroupNameException() { }
             public InvalidGroupNameException(string message) : base(message) { }
             public InvalidGroupNameException(string message, Exception inner) : base(message, inner) { }
@@ -219,7 +220,7 @@ namespace ThreeplyWebApi.Services.ScheduleParser
         [Serializable]
         public class BrokenWebSiteConnectionException : ScheduleParserException
         {
-            private static string _defaultMessage = "Durimg parsing, it was not to possible to get the next object of the Schedule.\n Connection with the site might be broken";
+            readonly private static string _defaultMessage = "Durimg parsing, it was not to possible to get the next object of the Schedule.\n Connection with the site might be broken";
             public BrokenWebSiteConnectionException() { }
             public BrokenWebSiteConnectionException(string message) : base(message) { }
             public BrokenWebSiteConnectionException(string message, Exception inner) : base(message, inner) { }
@@ -233,7 +234,7 @@ namespace ThreeplyWebApi.Services.ScheduleParser
         [Serializable]
         public class AbsenceScheduleObjectsException : ScheduleParserException
         {
-            private static string _defaultMessage = "Failed to get the objects with the schedule";
+            readonly private static string _defaultMessage = "Failed to get the objects with the schedule";
             public AbsenceScheduleObjectsException() { }
             public AbsenceScheduleObjectsException(string message) : base(message) { }
             public AbsenceScheduleObjectsException(string message, Exception inner) : base(message, inner) { }

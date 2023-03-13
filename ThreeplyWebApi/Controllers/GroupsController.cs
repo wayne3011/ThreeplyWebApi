@@ -9,6 +9,7 @@ using System.Net;
 using Microsoft.AspNetCore.Authorization;
 using ThreeplyWebApi.Controllers.AuthenticationScheme;
 using ThreeplyWebApi.Models.GroupModel;
+using ZstdSharp.Unsafe;
 
 namespace ThreeplyWebApi.Controllers
 {
@@ -44,7 +45,17 @@ namespace ThreeplyWebApi.Controllers
             }
             catch (ScheduleParserException ex)
             {
+                _logger.LogError("ScheduleParserException GET/{GroupName} GroupsController UserId:{UserId}, {exception}", groupName, HttpContext.User.Identity.Name,ex);
                 return ScheduleParserProblemResult(ex);            
+            }
+            catch (TimeoutException)
+            {
+                _logger.LogError("Group Database Timeout GET/{GroupName}, GroupsController UserId:{UserId}", groupName, HttpContext.User.Identity.Name);
+                return new StatusCodeResult(500);
+            }
+            catch (Exception)
+            {
+                return new StatusCodeResult(500);
             }
         }
         [HttpGet()]
@@ -55,31 +66,14 @@ namespace ThreeplyWebApi.Controllers
             _logger.LogInformation("GetGroupValidity/{GroupName} GroupController UserId:{UserId} Result:{isValid:}",groupName,HttpContext.User.Identity.Name, groupValidation.isValid);
             return groupValidation;
         }
-        [HttpPost]
-        public async Task<IActionResult> Post([FromBody]Group newGroup) 
-        {
-            await _groupsService.CreateAsync(newGroup);
-            return CreatedAtAction(nameof(Get), new { groupName = newGroup.GroupName }, newGroup);
-
-        }
-        [HttpPut]
-        public async Task<IActionResult> Update(string groupName, Group newGroup)
-        {
-            var group = await _groupsService.GetAsync(groupName);
-            if (group == null)
-            {
-                return NotFound();
-            }
-            newGroup.Id = group.Id;
-            await _groupsService.UpdateAsync(groupName, newGroup);
-            return NoContent();
-        }
-        private JsonResult ScheduleParserProblemResult(ScheduleParserException ex)
+        static private JsonResult ScheduleParserProblemResult(ScheduleParserException ex)
         {
             ProblemDetails problemDetails = ex.toProblemDetails();
-            JsonResult responce = new JsonResult(problemDetails);
-            responce.StatusCode = problemDetails.Status;
-            responce.ContentType = "application/json+problem; charset=utf-8";
+            JsonResult responce = new(problemDetails)
+            {
+                StatusCode = problemDetails.Status,
+                ContentType = "application/json+problem; charset=utf-8"
+            };
             return responce;
         }
     }

@@ -1,4 +1,4 @@
-﻿namespace ThreeplyWebApi.Services
+﻿namespace ThreeplyWebApi.Services.ServicesOptions
 {
     public class GroupsOptions
     {
